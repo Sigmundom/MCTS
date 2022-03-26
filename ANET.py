@@ -58,10 +58,10 @@ class ANET:
         one_hot = self.one_hot_encode(
             state) if self.one_hot_encode is not None else state
         output = self.model(np.expand_dims(one_hot, axis=0))[0].numpy()
-        best_action = np.argmax(output) + 1
+        best_action = np.argmax(output)
         while best_action not in possible_actions:
-            output[best_action-1] = -1
-            best_action = np.argmax(output) + 1
+            output[best_action] = -1
+            best_action = np.argmax(output)
         # print(output)
         # print('Best action:', best_action)
         return best_action

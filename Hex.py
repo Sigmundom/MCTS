@@ -60,27 +60,27 @@ class Hex(StateManager):
     def get_winner(self) -> int:
         return self._winner
 
+    @property
     def is_terminal_state(self) -> bool:
         # Only necessery to check if the player who had the previous turn wins
         if self.players_turn:
             left_side = self.board[:, 0]
             for cell in left_side:
                 # Opponent wins if cell on the left side is in same group with a cell on the right side
-                if max(cell.group, key=lambda cell: cell.r).r == self._dims[0]-1:
+                if max(cell.group, key=lambda cell: cell.c).c == self._dims[0]-1:
                     self._winner = -1
                     return True
         else:
             top_side = self.board[0, :]
             for cell in top_side:
-                print([(c.r, c.c) for c in cell.group])
-                if max(cell.group, key=lambda cell: cell.c).c == self._dims[0] - 1:
+                if max(cell.group, key=lambda cell: cell.r).r == self._dims[0] - 1:
                     self._winner = 1
                     return True
         return False
 
     def perform_action(self, action: int):
-        r = action % self._dims[0]
-        c = action // self._dims[0]
+        r = action // self._dims[0]
+        c = action % self._dims[0]
         cell = self.board[r, c]
         owner = 1 if self.players_turn else 2
         new_group = cell.set_owner(owner)
@@ -137,31 +137,31 @@ class Hex(StateManager):
         return '{}x{}'.format(config.HEX_BOARD_DIMS, config.HEX_BOARD_DIMS)
 
 
-if __name__ == '__main__':
-    a = Cell(1, 2)
-    print(a)
-    h = Hex()
-    h.perform_action(1)
-    print(Hex.one_hot_encode(h.state))
-    exit()
-    h.perform_action(0)
-    h.perform_action(3)
-    h.perform_action(1)
-    h.perform_action(6)
-    h.perform_action(2)
-    print(h.is_terminal_state())
-    h.visualize()
-    h.perform_action(5)
-    print(h.is_terminal_state())
-    h.perform_action(7)
-    print(h.is_terminal_state())
-    print(h.is_terminal_state())
+# if __name__ == '__main__':
+    # a = Cell(1, 2)
+    # print(a)
+    # h = Hex()
+    # print(h.is_terminal_state)
+    # h.perform_action(1)
+    # h.perform_action(3)
+    # h.perform_action(5)
+    # h.perform_action(6)
+    # h.perform_action(2)
+    # h.perform_action(4)
+    # print(h.is_terminal_state)
+    # h.visualize()
+    # exit()
+    # h.perform_action(5)
+    # print(h.is_terminal_state())
+    # h.perform_action(7)
+    # print(h.is_terminal_state())
+    # print(h.is_terminal_state())
 
-    print(h)
-    print([(c.r, c.c) for c in h.board.flatten()])
-    print(h.get_possible_actions())
-    # print(h.board[1,1].owner)
-    # print(h.board[1,2].owner)
-    print([(x.r, x.c) for x in h.board[0, 1].group])
-    # print(h.board[1,2].group)
-    h.visualize()
+    # print(h)
+    # print([(c.r, c.c) for c in h.board.flatten()])
+    # print(h.get_possible_actions())
+    # # print(h.board[1,1].owner)
+    # # print(h.board[1,2].owne-r)
+    # print([(x.r, x.c) for x in h.board[0, 1].group])
+    # # print(h.board[1,2].group)
+    # h.visualize()

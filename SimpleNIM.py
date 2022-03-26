@@ -31,10 +31,10 @@ class SimpleNIM(StateManager):
         return [not self._players_turn, self.num_pieces-action]
 
     def get_possible_actions(self) -> Iterable[int]:
-        return range(1, min(self.max_pick, self.num_pieces)+1)
+        return range(min(self.max_pick, self.num_pieces))
 
     def perform_action(self, action: int) -> State:
-        self.num_pieces -= action
+        self.num_pieces -= (action+1)
         self._players_turn = not self._players_turn
 
     def reset(self, state: Optional[State]) -> None:

@@ -110,11 +110,19 @@ class MCTree:
             # Choose action
             possible_actions = board.get_possible_actions()
             next_action = default_policy(current_node.state, possible_actions)
-            board.perform_action(next_action)
+            try:
+                board.perform_action(next_action)
+            except AssertionError as e:
+                print(board.state)
+                for r in range(3):
+                    print([c.owner for c in board.board[r, :]])
+                print(board.get_possible_actions())
+                print(next_action)
+                raise e
 
         # – Perform MCTS backpropagation from F to root.
         reward = board.get_winner()
-        assert reward == 1 if board.state[0] else -1
+
         while current_node is not None:
             current_node.update_node_statistics(reward)
             current_node = current_node.parent
