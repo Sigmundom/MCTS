@@ -3,9 +3,9 @@ from operator import mul
 GAME = 'NIM'
 # GAME = 'Hex'
 
-SAVE_INTERVAL = 25 # save interval for ANET (the actor network) parameters
-NUMBER_OF_GAMES = 50
-NUMBER_OF_SEACH_GAMES = 500
+SAVE_INTERVAL = 10  # save interval for ANET (the actor network) parameters
+NUMBER_OF_EPISODES = 20
+NUMBER_OF_SEACH_GAMES = 200
 EPSILON = 1
 EPSILON_DECAY_RATE = 0.5
 
@@ -20,3 +20,4 @@ NUM_ACTIONS = {'NIM': MAX_PICK, 'Hex': mul(*HEX_BOARD_DIMS)}[GAME]
 STATE_SIZE = {'NIM': 1 + NUM_PIECES, 'Hex': mul(*HEX_BOARD_DIMS)+1}[GAME]
 
 BATCH_SIZE = 32
+NUM_WORKERS = 4
