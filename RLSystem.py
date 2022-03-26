@@ -5,7 +5,6 @@ from typing import Type
 import tensorflow as tf
 import numpy as np
 from multiprocessing import Process, Queue, Lock
-# from multiprocessing.queues import Queue.Empty
 
 
 from ANET import ANET
@@ -16,7 +15,7 @@ from MCTree import MCTree
 import config
 
 
-def run_episode(game, behaviour_policy, rbuf_queue, lock):
+def run_episode(game, behaviour_policy, rbuf_queue):
     # (a) Initialize the actual game board (Ba) to an empty board.
     actual_board = game()
     # (b) sinit ← starting board state
@@ -25,8 +24,6 @@ def run_episode(game, behaviour_policy, rbuf_queue, lock):
     MC_tree = MCTree(initial_state)
     # (d) While Ba not in a final state:
     while not actual_board.is_terminal_state:
-        # with lock:
-        #     print('Running', actual_board.state)
         # • Initialize Monte Carlo game board (Bmc) to same state as root.
         MC_board = game(MC_tree.root.state)
         # • For gs in number search games:
@@ -69,7 +66,7 @@ class RLSystem():
             'NIM': SimpleNIM, 'Hex': Hex
         }[config.GAME]
 
-        self.RBUF = []
+        self.rbuf = []
 
     # 1. i_s = save interval for ANET (the actor network) parameters
         self.ANET = ANET(one_hot_encode=self._game.one_hot_encode)
@@ -85,12 +82,12 @@ class RLSystem():
         # while not self.rbuf_queue.empty():
         try:
             training_case = self.rbuf_queue.get(timeout=2)
-            print('Got case:', training_case)
+            print(training_case)
 
-            self.RBUF.append(training_case)
+            self.rbuf.append(training_case)
             # (e) Train ANET on a random minibatch of cases from RBUF
-            batch = sample(self.RBUF, min(len(self.RBUF), config.BATCH_SIZE))
-            self.ANET.fit(batch, epochs=10)
+            batch = sample(self.rbuf, min(len(self.rbuf), config.BATCH_SIZE))
+            self.ANET.fit(batch, epochs=3)
 
         except Empty as e:
             print('No items in queue')
@@ -110,35 +107,44 @@ class RLSystem():
         print('Starting RL system')
 
         while self.episode_counter > 0:
-            episodes = [Process(target=run_episode, args=(self._game, self.ANET.default_policy_epsilon, self.rbuf_queue, self.console_lock))
+            episodes = [Process(target=run_episode, args=(self._game, self.ANET.default_policy_epsilon, self.rbuf_queue))
                         for _ in range(min(self.episode_counter, config.NUM_WORKERS))]
             print('Starting processes')
             for episode in episodes:
                 episode.start()
 
-            print('Training ANET')
-            while not self.rbuf_queue.empty() or any([e.is_alive() for e in episodes]):
-                self.train_ANET()
+            # print('Training ANET')
+            # while not self.rbuf_queue.empty() or any([e.is_alive() for e in episodes]):
+            #     self.train_ANET()
             print('Training complete')
             for episode in episodes:
                 episode.join()
 
-            print('Processes joined')
+            while not self.rbuf_queue.empty():
+                item = self.rbuf_queue.get()
+                print(item)
+                self.rbuf.append(item)
+
+            for i in range(2*len(episodes)):
+                batch = sample(self.rbuf, min(
+                    len(self.rbuf), config.BATCH_SIZE))
+                # print('Batch:')
+                # print(batch)
+                self.ANET.fit(batch, epochs=10)
+
             self.ANET.epsilon_decay()
+            # print('Processes joined')
+            # self.ANET.epsilon_decay()
 
+            for i in range(self.episode_counter, self.episode_counter-len(episodes), -1):
+                if (i-1) % config.SAVE_INTERVAL == 0:
+                    print("Saving ANET's parameters")
+                    # • Save ANET’s current parameters for later use in tournament play.
+                    self.ANET.save('models/{}/{}/{}x{}'.format(self._game.__name__,
+                                                               self._game.get_config(), config.NUMBER_OF_EPISODES-i+1, config.NUMBER_OF_SEACH_GAMES))
             self.episode_counter -= len(episodes)
+
             print('{} episodes left'.format(self.episode_counter))
-
-        # 4. For ga in number actual games:
-        # for g_a in range(config.NUMBER_OF_EPISODES):
-        #     print('Episode {}'.format(g_a), end='\r')
-        #     self._run_episode()
-
-        #     if (g_a+1) % config.SAVE_INTERVAL == 0:
-        #         print("Saving ANET's parameters")
-        #         # • Save ANET’s current parameters for later use in tournament play.
-        #         self.ANET.save('models/{}/{}/{}x{}'.format(self._game.__name__,
-        #                        self._game.get_config(), g_a+1, config.NUMBER_OF_SEACH_GAMES))
 
 
 if __name__ == '__main__':

@@ -28,8 +28,8 @@ class ANET:
         else:
             self.model = tf.keras.models.Sequential([
                 tf.keras.layers.InputLayer(input_shape=(config.STATE_SIZE,)),
-                tf.keras.layers.Dense(32, activation='sigmoid'),
-                tf.keras.layers.Dense(32, activation='sigmoid'),
+                tf.keras.layers.Dense(32, activation='relu'),
+                tf.keras.layers.Dense(32, activation='relu'),
                 tf.keras.layers.Dense(config.NUM_ACTIONS, activation='softmax')
             ])
 
@@ -57,16 +57,13 @@ class ANET:
     def default_policy(self, state: State, possible_actions: Tuple[int, ...]) -> int:
         one_hot = self.one_hot_encode(
             state) if self.one_hot_encode is not None else state
-        output = self.model(np.expand_dims(one_hot, axis=0))[0]
-        best_score = 0
-        best_action = -1
-        for action in possible_actions:
-            if output[action-1] > best_score:
-                best_score = output[action-1]
-                best_action = action
-
-        assert best_action != -1
-
+        output = self.model(np.expand_dims(one_hot, axis=0))[0].numpy()
+        best_action = np.argmax(output) + 1
+        while best_action not in possible_actions:
+            output[best_action-1] = -1
+            best_action = np.argmax(output) + 1
+        # print(output)
+        # print('Best action:', best_action)
         return best_action
 
     def epsilon_decay(self):
