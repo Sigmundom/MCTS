@@ -16,7 +16,6 @@ class Cell:
         self.group = [self]
 
     def set_owner(self, owner: int):
-        assert self.owner == 0
         self.owner = owner
         return self.group
 
@@ -50,6 +49,7 @@ class Hex(StateManager):
 
     def generate_child_state(self, action: int) -> State:
         child_state = self.state
+        child_state[0] = abs(child_state[0]-1)
         child_state[action+1] = 1 if self.players_turn else 2
         return child_state
 
@@ -78,11 +78,14 @@ class Hex(StateManager):
                     return True
         return False
 
-    def perform_action(self, action: int):
+    def perform_action(self, action: int, owner: Optional[int] = None):
         r = action // self._dims[0]
         c = action % self._dims[0]
         cell = self.board[r, c]
-        owner = 1 if self.players_turn else 2
+        assert cell.owner == 0, "Cell occupied. Owner: {} \nAction:{} \nState: {} \nPossible Actions: {}".format(
+            cell.owner, action, self.state, self.get_possible_actions())
+        if owner is None:
+            owner = 1 if self.players_turn else 2
         new_group = cell.set_owner(owner)
         for neighbour_idx in get_neighbours(r, c, self._dims[0]):
             neighbour = self.board[neighbour_idx]
@@ -92,15 +95,21 @@ class Hex(StateManager):
         self._players_turn = not self._players_turn
 
     def reset(self, state: Optional[State] = None) -> None:
-        # if state is not None:
-        #   assert len(state) == self.board.size
-        #   self.state = state
-        # else:
-        self._players_turn = True
+        self._winner = 0
         self.board = np.empty(self._dims, dtype='object')
         for r in range(self._dims[0]):
             for c in range(self._dims[1]):
                 self.board[r, c] = Cell(r, c)
+        if state is None:
+            self._players_turn = True
+        else:
+            for i, owner in enumerate(state[1:]):
+                if owner != 0:
+                    self.perform_action(i, owner)
+            self._players_turn = bool(state[0])
+
+            assert self.state == state, "State doens't match! \n{}\n{}".format(
+                self.state, state)
 
     def visualize(self):
         plt.axes()
@@ -134,20 +143,27 @@ class Hex(StateManager):
     @classmethod
     def get_config(cls) -> str:
         '''Returns a string representation of the current game config'''
-        return '{}x{}'.format(config.HEX_BOARD_DIMS, config.HEX_BOARD_DIMS)
+        return '{}x{}'.format(*config.HEX_BOARD_DIMS)
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
     # a = Cell(1, 2)
     # print(a)
-    # h = Hex()
+    h = Hex()
+    # for i in range(9):
+    #     print(h.get_possible_actions())
+    #     h.perform_action(i)
+    # h.visualize()
     # print(h.is_terminal_state)
-    # h.perform_action(1)
-    # h.perform_action(3)
-    # h.perform_action(5)
-    # h.perform_action(6)
-    # h.perform_action(2)
-    # h.perform_action(4)
+    h.perform_action(1)
+    print(h.generate_child_state(3))
+    h.perform_action(3)
+    print(h.state)
+    h.perform_action(5)
+    h.perform_action(6)
+    h.perform_action(2)
+    h.perform_action(4)
+    print(h.get_possible_actions())
     # print(h.is_terminal_state)
     # h.visualize()
     # exit()

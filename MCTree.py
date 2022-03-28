@@ -85,9 +85,10 @@ class MCTree:
         return s
 
     def simulate(self, board: StateManager, default_policy: Callable[[State, PossibleActions], Action]):
-        # – Use tree policy Pt to search from root to a leaf (L) of MCT. Update Bmc with each move.
+        board.reset(self.root.state)
         current_node = self.root
 
+        # – Use tree policy Pt to search from root to a leaf (L) of MCT. Update Bmc with each move.
         while not current_node.is_leaf:
             next_action = current_node.tree_policy()
             current_node = current_node.children[next_action]
@@ -110,15 +111,7 @@ class MCTree:
             # Choose action
             possible_actions = board.get_possible_actions()
             next_action = default_policy(current_node.state, possible_actions)
-            try:
-                board.perform_action(next_action)
-            except AssertionError as e:
-                print(board.state)
-                for r in range(3):
-                    print([c.owner for c in board.board[r, :]])
-                print(board.get_possible_actions())
-                print(next_action)
-                raise e
+            board.perform_action(next_action)
 
         # – Perform MCTS backpropagation from F to root.
         reward = board.get_winner()

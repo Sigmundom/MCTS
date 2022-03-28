@@ -1,10 +1,8 @@
-from math import sqrt
 from queue import Empty
 from random import sample
 from typing import Type
-import tensorflow as tf
 import numpy as np
-from multiprocessing import Process, Queue, Lock
+from multiprocessing import Process, Queue
 
 
 from ANET import ANET
@@ -14,57 +12,52 @@ from StateManager import StateManager
 from MCTree import MCTree
 import config
 
-lock = Lock()
+
+class Episode(Process):
+    def __init__(self, game, behaviour_policy, rbuf_queue):
+        super().__init__()
+        self.actual_board = game()
+        self.MC_board = game()
+        self.behaviour_policy = behaviour_policy
+        self.rbuf_queue = rbuf_queue
+        self.MC_tree = MCTree(self.actual_board.state)
+        self.one_hot = game.one_hot_encode
+
+    def run(self):
+        while not self.actual_board.is_terminal_state:
+            for _ in range(config.NUMBER_OF_SEACH_GAMES):
+                self.MC_tree.simulate(self.MC_board, self.behaviour_policy)
+
+            # • D = distribution of visit counts in MCT along all arcs emanating from root.
+            D = np.zeros(config.NUM_ACTIONS)
+            for action, node in self.MC_tree.root.children.items():
+                D[action] = node.visit_count
+
+            D /= D.sum()
+
+            # • Add case (root, D) to RBUF
+            root_state = self.one_hot(self.MC_tree.root.state)
+
+            # self.RBUF.append((root_state, D))
+            self.rbuf_queue.put((root_state, D))
+
+            # • Choose actual move (a*) based on D (with a good portion of randomness)
+            D_a = np.power(D, (1/config.DISTRIBUTION_SMOOTHING_FACTOR))
+            D_a /= D_a.sum()
+            action = np.random.choice(len(D_a), p=D_a)
+
+            # • Perform a* on root to produce successor state s*
+            # • Update Ba to s*
+            self.actual_board.perform_action(action)
+       
+            # • In MCT, retain subtree rooted at s*; discard everything else.
+            # • root ← s*
+            self.MC_tree.update_root(action)
 
 
-def run_episode(game, behaviour_policy, rbuf_queue):
-    global lock
-    # (a) Initialize the actual game board (Ba) to an empty board.
-    actual_board = game()
-    # (b) sinit ← starting board state
-    initial_state = actual_board.state
-    # (c) Initialize the Monte Carlo Tree (MCT) to a single root, which represents sinit
-    MC_tree = MCTree(initial_state)
-    print(actual_board.state)
-    print(actual_board.is_terminal_state)
-    # (d) While Ba not in a final state:
-    while not actual_board.is_terminal_state:
-        with lock:
-            print('Running', actual_board.state)
-        # • Initialize Monte Carlo game board (Bmc) to same state as root.
-        MC_board = game(MC_tree.root.state)
-        # • For gs in number search games:
-        for g_s in range(config.NUMBER_OF_SEACH_GAMES):
-            MC_tree.simulate(MC_board, behaviour_policy)
-            MC_board.reset(MC_tree.root.state)
+# def run_episode(game, behaviour_policy, rbuf_queue):
 
-        # • next gs ???
-        # • D = distribution of visit counts in MCT along all arcs emanating from root.
-        D = np.zeros(config.NUM_ACTIONS)
-        for action, node in MC_tree.root.children.items():
-            D[action] = node.visit_count
-
-        D /= D.sum()
-
-        # • Add case (root, D) to RBUF
-        root_state = game.one_hot_encode(MC_tree.root.state)
-
-        # self.RBUF.append((root_state, D))
-        rbuf_queue.put((root_state, D))
-
-        # • Choose actual move (a*) based on D (with a good portion of randomness)
-        D_a = np.power(D, (1/5))
-        D_a /= D_a.sum()
-        action = np.random.choice(len(D_a), p=D_a)
-
-        # • Perform a* on root to produce successor state s*
-        # • Update Ba to s*
-        actual_board.perform_action(action)
-        # • In MCT, retain subtree rooted at s*; discard everything else.
-        # • root ← s*
-        MC_tree.update_root(action)
-
-    return
+    # return
 
 
 class RLSystem():
@@ -77,34 +70,34 @@ class RLSystem():
 
     # 1. i_s = save interval for ANET (the actor network) parameters
         self.ANET = ANET(one_hot_encode=self._game.one_hot_encode)
-        # self.ANET_lock = Lock()
         self.rbuf_queue = Queue()
-        self.console_lock = Lock()
         self.episode_counter = config.NUMBER_OF_EPISODES
 
     def run(self):
-        print('Starting RL system')
+        print('Starting RL system with {} workers'.format(config.NUM_WORKERS))
 
         while self.episode_counter > 0:
-            episodes = [Process(target=run_episode, args=(self._game, self.ANET.default_policy_epsilon, self.rbuf_queue))
-                        for _ in range(min(self.episode_counter, config.NUM_WORKERS))]
-            print('Starting processes')
-            for episode in episodes:
-                episode.start()
+            episodes = []
 
-            print('Training complete')
+            print('Starting processes')
+            for _ in range(min(self.episode_counter, config.NUM_WORKERS)):
+                episode = Episode(
+                    self._game, self.ANET.default_policy_epsilon, self.rbuf_queue)
+                episode.start()
+                episodes.append(episode)
+
             for episode in episodes:
                 episode.join()
+            print('Training complete')
 
             while not self.rbuf_queue.empty():
                 item = self.rbuf_queue.get()
                 print(item)
                 self.rbuf.append(item)
 
-            for i in range(2*len(episodes)):
-                batch = sample(self.rbuf, min(
-                    len(self.rbuf), config.BATCH_SIZE))
-                self.ANET.fit(batch, epochs=10)
+            batch = sample(self.rbuf, min(
+                len(self.rbuf), len(episodes)*config.BATCH_SIZE))
+            self.ANET.fit(batch, epochs=10)
 
             self.ANET.epsilon_decay()
 

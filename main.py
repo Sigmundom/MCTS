@@ -1,15 +1,18 @@
 import os
+from Hex import Hex
 from InquirerPy import prompt, inquirer
 from InquirerPy.base.control import Choice
 from SimpleNIM import SimpleNIM
 from Simulator import Simulator
 
-games = [SimpleNIM]
+games = [SimpleNIM, Hex]
+
 
 def main():
     game = inquirer.select(
         message="Welcom!\nSelect a game!",
-        choices=list(map(lambda game: Choice(value=game, name=game.__name__), games))
+        choices=list(map(lambda game: Choice(
+            value=game, name=game.__name__), games))
     ).execute()
 
     # mode = inquirer.select(
@@ -22,7 +25,7 @@ def main():
         ai = inquirer.confirm(
             message="Do you want to use and AI for player {}?".format(i+1),
             default=True
-            ).execute()
+        ).execute()
 
         if ai:
             model_path = 'models/{}'.format(game.__name__)
@@ -30,7 +33,7 @@ def main():
                 message="Select configuration",
                 choices=os.listdir(model_path)
             ).execute()
-            model_path+='/{}'.format(config)
+            model_path += '/{}'.format(config)
             episodes = inquirer.select(
                 message='How well trained should the AI be? (number of episodes)',
                 choices=os.listdir(model_path)

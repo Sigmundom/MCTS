@@ -28,20 +28,22 @@ class ANET:
         else:
             self.model = tf.keras.models.Sequential([
                 tf.keras.layers.InputLayer(input_shape=(config.STATE_SIZE,)),
-                tf.keras.layers.Dense(32, activation='relu'),
-                tf.keras.layers.Dense(32, activation='relu'),
-                tf.keras.layers.Dense(config.NUM_ACTIONS, activation='softmax')
+                *[tf.keras.layers.Dense(neurons, activation=config.ACTIVATION_HIDDEN)
+                  for neurons in config.HIDDEN_LAYERS],
+                tf.keras.layers.Dense(
+                    config.NUM_ACTIONS, activation=config.ACTIVATION_OUTPUT)
             ])
 
-            self.model.compile(optimizer='adam',
-                               loss='categorical_crossentropy',
+            self.model.compile(optimizer=config.OPTIMIZER(learning_rate=config.LEARNING_RATE),
+                               loss=config.LOSS,
                                metrics=['accuracy', 'mse'])
         self.model.build()
         self.model.summary()
 
     def fit(self, batch, epochs=5):
-        x, y = zip(*batch)
-        self.model.fit(np.array(x), np.array(y), epochs)
+        x, y = zip(*batch)      
+        self.model.fit(np.array(x), np.array(y), epochs=epochs,
+                       batch_size=max(len(batch), config.BATCH_SIZE))
 
     def evaluate(self, input, target):
         self.model.evaluate(input, target)
